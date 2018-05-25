@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>GeoGuesser</title>
+</head>
+<body>
+
+
+<label>
+  Your name:
+  <input id="player" type="text">
+  </label>
+
+
+<h2>Where is this place?? (If you get far off the first time you click you can click again to get closer)</h2>
+<div id="secret"></div>
+<div id="map" style="width:500px; height: 300px;"></div>
+<div id="results"></div>
+<button id="nextbutton">I'm ready to guess the next place!(or we landed you in the middle of the ocean)</button>
+
+
+<script>
+    var place;
+    var placeNum = 0;
+    var userMarker;
+    var player = document.getElementById("player")
+
+    function onMapsAPILoad() {
+      var center = {lat: 0, lng: 0};
+      var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 1,
+          center: center
+      });
+      
+      
+
+      map.addListener('click', function(e) {
+        // Create or reposition marker
+        if (!userMarker) {
+          userMarker = new google.maps.Marker({
+              position: e.latLng,
+              map: map
+          });
+        } else {
+          userMarker.setMap(map);
+          userMarker.setPosition(e.latLng);
+        }
+        // Calculate distance from current secret
+        var distanceAway = getDistance(e.latLng.toJSON(), place);
+        distanceAway=distanceAway*0.000621371
+        
+        insertScore(player.value, distanceAway);
+        
+        // Show results 
+        var resultsDiv = document.getElementById("results");
+        results.innerHTML = distanceAway + " miles away!";
+      });
+
+      var nextButton = document.getElementById("nextbutton");
+      nextButton.addEventListener("click", function() {
+        placeNum++;
+        displayNextPlace();
+        
+        
+        var img = document.createElement("img");
+        img.src="https://i.giphy.com/media/3ohhwgrL4KKPIZoTQY/giphy.webp";
+        
+        
+        var secretDiv = document.getElementById("secret");
+        secretDiv.innerHTML = "";
+        secretDiv.appendChild(img); 
+        
+      });
+
+      displayNextPlace();
+    };
+
+    function displayNextPlace() {
+      
+      
+      
+      var latitude= Math.random()*160-30;
+      var longitude= Math.random()*360-180;
+      
+      place={lat:latitude, lng:longitude};
+      
+      var service = new google.maps.StreetViewService();
+      var panOptions = {
+        preference: 'nearest', 
+        location: place,
+        radius: 1000
+      }
+      service.getPanorama(panOptions, function(data, status){
+       if(status !== "OK"){
+         displayNextPlace();
+         return;
+       }
+       place = data.location.latLng.toJSON();
+       var img = document.createElement("img");
+        img.src="https://maps.googleapis.com/maps/api/streetview?size=500x300&location="+ place.lat +","+ place.lng+"&heading=90&pitch=10&key=AIzaSyBuJk0ZN3yMa6mM8lOX9-Qhn-x1QEfa6tY";
+        
+
+        var secretDiv = document.getElementById("secret");
+        secretDiv.innerHTML = "";
+        secretDiv.appendChild(img); 
+      });
+      
+      
+      
+    };
+
+    // Distance calculation functions, very useful!
+    var rad = function(x) {
+      return x * Math.PI / 180;
+    };
+
+    var getDistance = function(p1, p2) {
+      var R = 6378137; // Earth’s mean radius in meter
+      var dLat = rad(p2.lat - p1.lat);
+      var dLong = rad(p2.lng - p1.lng);
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) *
+          Math.sin(dLong / 2) * Math.sin(dLong / 2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      var d = R * c;
+      return d; // returns the distance in meter
+    };
+
+
+    function insertScore(player, score) {
+      var url = '/scores/insert';
+
+      var request = new XMLHttpRequest();
+      request.addEventListener('load', function () {
+        if (this.status !== 200) {
+          alert('Error!');
+          console.log(this.response);
+        } else {
+          getScores();
+        }
+      });
+      request.open('POST', url, true);
+      request.setRequestHeader('Content-type', 'application/json');
+      var data = {'player': player, 'score': score};
+      request.send(JSON.stringify(data));
+      }
+
+  function getScores() {
+    var url = '/scores/top10';
+
+    var request = new XMLHttpRequest();
+    request.addEventListener('load', function () {
+      var scores = JSON.parse(this.responseText);
+      console.log(scores);
+      var scoresDiv = document.getElementById('scores');
+      scoresDiv.innerHTML = '';
+      for (var i = 0; i < scores.length; i++) {
+        scoresDiv.innerHTML += '<li>' + scores[i].player + ': ' + scores[i].score;
+    }
+  });
+  request.open('GET', url, true);
+  request.setRequestHeader('Content-type', 'application/json');
+  request.send();
+  }
+
+getScores();
+
+
+</script>
+<script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBuJk0ZN3yMa6mM8lOX9-Qhn-x1QEfa6tY&callback=onMapsAPILoad">
+</script>
+
+
+<ol>
+ <h4>High scores</h4>
+ <ol id="scores">
+   Loading...
+ </ol>
+
+
+</body>
+</html>
